@@ -1,0 +1,6 @@
+docker build --tag python-djang-chat_with_file:v1 .
+docker run --publish 8000:8000 python-djang-chat_with_file:v1
+
+docker tag python-djang-chat_with_file:v1 azoneslab/chat_with_file:v1
+docker push azoneslab/chat_with_file:v1
+

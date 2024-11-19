@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+<style>
+  .card {
+    border: none;
+    box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-header {
+    background-color: #6c5ce7;
+    color: #fff;
+  }
+
+  .btn-primary {
+    background-color: #6c5ce7;
+    border-color: #6c5ce7;
+    transition: background-color 0.3s ease;
+  }
+
+  .btn-primary:hover {
+    background-color: #4834d4;
+    border-color: #4834d4;
+  }
+
+  .drag-drop-area {
+    border: 2px dashed #6c5ce7;
+    border-radius: 10px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  .drag-drop-area.dragover {
+    background-color: #eceaff;
+  }
+
+  .drag-drop-area input[type="file"] {
+    display: none;
+  }
+
+  .drag-drop-area label {
+    font-size: 18px;
+    font-weight: bold;
+    color: #6c5ce7;
+  }
+
+  #fileInfo {
+    margin-top: 10px;
+    font-size: 16px;
+    color: #333;
+  }
+
+  #uploadButton {
+    display: none;
+  }
+
+  .file-info {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #6c5ce7;
+  }
+
+  /* Loading Spinner Styles */
+  #loadingSpinner {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  #loadingSpinner .spinner-border {
+    width: 3rem;
+    height: 3rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% load static %}
+<div class="card-header" style="background-color: white; color: black;">
+  <img src="{% static 'images/logo.png' %}" alt="Logo" style="height: 40px;">
+  <div style="font-size: 25px; font-weight: bold;">Chat With File</div>
+</div>
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-6 offset-md-3">
+      <div class="card">
+        <div class="card-header text-center">
+          <h4 class="mb-0">Upload to Chat with File</h4>
+        </div>
+        <div class="card-body">
+          <form id="uploadForm" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+              <div id="dragDropArea" class="drag-drop-area">
+                <input type="file" name="file" id="fileInput" required>
+                <label for="fileInput">Drag & Drop your file here or click to browse</label>
+                <div class="file-info">Accepted file types: .txt, .pdf, .csv, .xls, .xlsx, .md, .docx</div>
+              </div>
+              <div id="fileInfo"></div>
+              <button id="uploadButton" type="submit" class="btn btn-primary btn-block">Upload</button>
+            </div>
+          </form>
+
+          <!-- Loading Spinner -->
+          <div id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+              <span class="sr-only">Processing...</span>
+            </div>
+            <div>Processing...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dragDropArea = document.getElementById('dragDropArea');
+  const fileInput = document.getElementById('fileInput');
+  const uploadButton = document.getElementById('uploadButton');
+  const fileInfo = document.getElementById('fileInfo');
+  const loadingSpinner = document.getElementById('loadingSpinner');
+
+  const allowedFileTypes = [
+    'text/plain', 
+    'application/pdf', 
+    'text/csv', 
+    'application/vnd.ms-excel', 
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+
+  const allowedExtensions = ['txt', 'pdf', 'csv', 'xls', 'xlsx', 'md', 'docx'];
+
+  dragDropArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dragDropArea.classList.add('dragover');
+  });
+
+  dragDropArea.addEventListener('dragleave', () => {
+    dragDropArea.classList.remove('dragover');
+  });
+
+  dragDropArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDropArea.classList.remove('dragover');
+    fileInput.files = e.dataTransfer.files; // Assign the dropped files to the file input
+    updateFileInfo();
+  });
+
+  dragDropArea.addEventListener('click', () => {
+    fileInput.click(); // Trigger file input click when the drag-drop area is clicked
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      updateFileInfo();
+    }
+  });
+
+  function updateFileInfo() {
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const fileType = file.type;
+      const fileName = file.name;
+      const fileExtension = fileName.split('.').pop().toLowerCase(); // Get the file extension
+
+      if (allowedFileTypes.includes(fileType) || allowedExtensions.includes(fileExtension)) {
+        fileInfo.textContent = `Selected file: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+        uploadButton.style.display = 'block'; // Show the upload button
+      } else {
+        alert('Invalid file type. Please upload a file with one of the following formats: .txt, .pdf, .csv, .xls, .xlsx, .md, .docx');
+        fileInput.value = ''; // Reset the file input
+        fileInfo.textContent = ''; // Clear the file information
+        uploadButton.style.display = 'none'; // Hide the upload button
+      }
+    } else {
+      fileInfo.textContent = '';
+      uploadButton.style.display = 'none'; // Hide the upload button
+    }
+  }
+
+  // Show loading spinner on form submission and handle redirection
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent the form from submitting the traditional way
+
+    const file = fileInput.files[0];
+    const fileExtension = file.name.split('.').pop().toLowerCase(); // Get the file extension
+
+    if (allowedFileTypes.includes(file.type) || allowedExtensions.includes(fileExtension)) {
+      loadingSpinner.style.display = 'block'; // Show loading spinner
+      uploadButton.style.display = 'none'; // Hide upload button
+
+      try {
+        const response = await fetch('', {
+          method: 'POST',
+          body: new FormData(e.target),
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('File processing failed.');
+        }
+
+        // Assuming the server redirects after successful file upload:
+        window.location.href = response.url;
+
+      } catch (error) {
+        alert(error.message); // Show alert message on error
+        loadingSpinner.style.display = 'none'; // Hide loading spinner
+        uploadButton.style.display = 'none'; // Show upload button again
+        fileInput.value = ''; // Reset the file input
+        fileInfo.textContent = ''; // Clear the file information
+      }
+    } else {
+      alert('Invalid file type. Please upload a valid file.');
+    }
+  });
+</script>
+{% endblock %}
